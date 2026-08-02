@@ -1,0 +1,15 @@
+# Normalize line endings for text files so Git handles them consistently
+# across your Ubuntu and Windows machines.
+* text=auto eol=lf
+
+# Explicitly force LF for the file types this project uses
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+
+# Treat these as binary (never touch line endings)
+*.png  binary
+*.jpg  binary
+*.json.gz binary

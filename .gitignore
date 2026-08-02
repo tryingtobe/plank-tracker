@@ -67,3 +67,5 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+public/build-tools/node_modules/
+public/build-tools/node_modules/
