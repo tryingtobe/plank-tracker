@@ -432,7 +432,7 @@
                 const isToday = dateKey === todayKey;
                 const isSelected = dateKey === selectedDateKey;
 
-                let classes = 'p-2 border rounded-lg cursor-pointer hover:border-purple-300 ';
+                let classes = 'p-2 border border-gray-200 rounded-lg cursor-pointer hover:border-purple-300 ';
                 classes += logs.length > 0 ? 'day-done ' : 'bg-gray-50 ';
                 if (isToday) classes += 'ring-2 ring-offset-1 ring-purple-400 ';
                 if (isSelected) classes += 'outline outline-2 outline-purple-700 ';
