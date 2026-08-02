@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .day-done { background-color: #9333ea !important; color: white !important; }
+        .nav-btn { transition: all 0.2s; }
+    </style>
+</head>
+<body class="pb-24 bg-gray-100 font-sans">
+
+    <!-- TRACKER PAGE -->
+    <div id="page-tracker" class="tab-content active p-6 max-w-md mx-auto">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-gray-800">Workout Pro</h1>
+        </header>
+
+        <section class="text-center bg-purple-100 p-6 rounded-3xl mb-6 shadow-inner relative">
+            <div class="flex items-center justify-center gap-6 mb-4">
+                <button onclick="adjustTimer(-5)" class="w-12 h-12 bg-white rounded-full shadow-md font-bold text-lg">-5s</button>
+                <button onclick="toggleDurationMenu()" class="w-24 focus:outline-none">
+                    <div id="timer" class="text-5xl font-mono font-bold text-purple-700">60</div>
+                    <span class="text-[10px] text-purple-500 uppercase font-bold tracking-wider">Tap to edit</span>
+                </button>
+                <button onclick="adjustTimer(5)" class="w-12 h-12 bg-white rounded-full shadow-md font-bold text-lg">+5s</button>
+            </div>
+
+            <div id="duration-menu" class="hidden absolute top-24 left-4 right-4 bg-white p-4 rounded-2xl shadow-xl z-20">
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setDuration(1)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">1m</button>
+                    <button onclick="setDuration(5)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">5m</button>
+                    <button onclick="setDuration(10)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">10m</button>
+                </div>
+            </div>
+            
+            <div class="flex gap-4 justify-center">
+                <button onclick="toggleTimer()" id="startBtn" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold shadow-md">Start</button>
+                <button onclick="saveWorkout()" class="flex-1 py-3 bg-green-500 text-white rounded-2xl font-bold shadow-md">Save</button>
+                <button onclick="stopTimer()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold shadow-md">Reset</button>
+            </div>
+        </section>
+
+        <h1 id="exercise-title" class="text-2xl font-bold mb-4 text-center">Plank</h1>
+        <!-- Lottie Animation Players -->
+        <div class="w-full aspect-square bg-white rounded-3xl mb-6 shadow-sm p-4 overflow-hidden">
+            <lottie-player id="plank-view" src="animations/T Plank Exercise.json" loop autoplay class="w-full h-full"></lottie-player>
+            <lottie-player id="pushup-view" src="animations/Push Ups.json" loop autoplay class="w-full h-full hidden"></lottie-player>
+        </div>
+
+        <div class="flex gap-4">
+            <button id="btn-plank" onclick="setExercise('plank')" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold">Plank</button>
+            <button id="btn-pushup" onclick="setExercise('pushup')" class="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold">Push-ups</button>
+        </div>
+    </div>
+
+    <!-- CALENDAR PAGE -->
+    <div id="page-calendar" class="tab-content p-6 max-w-md mx-auto">
+        <header class="flex justify-between items-center mb-6">
+            <button onclick="changeMonth(-1)" class="p-2 bg-white rounded-lg shadow-sm font-bold hover:bg-gray-200">Prev</button>
+            <h1 id="month-name" class="text-xl font-bold"></h1>
+            <button onclick="changeMonth(1)" class="p-2 bg-white rounded-lg shadow-sm font-bold hover:bg-gray-200">Next</button>
+        </header>
+        <div class="bg-white p-4 rounded-3xl shadow-md grid grid-cols-7 gap-2 text-center" id="calendar"></div>
+        <div class="mt-6 p-4 bg-white rounded-2xl shadow-sm border border-purple-100">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-gray-700">Details</h3>
+                <button id="clear-day-btn" onclick="clearSelectedDay()" class="hidden text-xs bg-red-100 text-red-600 px-3 py-1 rounded font-bold">Discard</button>
+            </div>
+            <div id="log-list" class="text-sm text-gray-600">Select a date.</div>
+        </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div id="page-history" class="tab-content p-6 max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Your Progress</h1>
+        <div class="bg-white p-6 rounded-3xl shadow-md text-center">
+            <div id="stats-total" class="text-5xl font-bold text-purple-600 mb-2">0</div>
+            <p class="text-gray-500 font-bold">Total Sessions</p>
+            <div id="stats-details" class="mt-6 text-sm font-bold text-gray-700 p-4 bg-gray-50 rounded-xl"></div>
+        </div>
+        <button onclick="clearData()" class="mt-8 w-full py-3 bg-red-100 text-red-600 rounded-2xl font-bold text-sm hover:bg-red-200">Reset Data</button>
+    </div>
+
+    <!-- MODAL -->
+    <div id="log-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+            <h2 class="font-bold text-lg mb-4 text-purple-800" id="modal-date">Log</h2>
+            <select id="modal-ex" class="w-full p-3 mb-2 border rounded-xl bg-gray-50"><option>Plank</option><option>Push-ups</option></select>
+            <input type="number" id="modal-count" placeholder="Reps / Seconds" class="w-full p-3 mb-2 border rounded-xl">
+            <input type="text" id="modal-time" placeholder="Time Taken (e.g. 5m)" class="w-full p-3 mb-4 border rounded-xl">
+            <div class="flex gap-2">
+                <button onclick="saveManualEntry()" class="flex-1 bg-purple-600 text-white p-3 rounded-xl font-bold">Save</button>
+                <button onclick="document.getElementById('log-modal').classList.add('hidden')" class="flex-1 bg-gray-200 p-3 rounded-xl font-bold">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="fixed bottom-0 w-full bg-white border-t p-4 flex justify-around z-40 shadow-t-lg">
+        <button onclick="switchTab('tracker')" class="nav-btn font-bold text-purple-600 p-2">Tracker</button>
+        <button onclick="switchTab('calendar')" class="nav-btn font-bold p-2">Calendar</button>
+        <button onclick="openHistory()" class="nav-btn font-bold p-2">History</button>
+    </nav>
+
+    <script>
+        let currentMonth = new Date();
+        let completedDays = JSON.parse(localStorage.getItem('plankDays') || '{}');
+        let timeLeft = 60; let timerId = null;
+
+        function updateTimerDisplay() { document.getElementById('timer').innerText = timeLeft; }
+        function toggleTimer() { if (timerId) { clearInterval(timerId); timerId = null; document.getElementById('startBtn').innerText = 'Resume'; } else { document.getElementById('startBtn').innerText = 'Pause'; timerId = setInterval(() => { timeLeft--; updateTimerDisplay(); if(timeLeft<=0) stopTimer(); }, 1000); } }
+        function stopTimer() { clearInterval(timerId); timerId = null; timeLeft = 60; updateTimerDisplay(); document.getElementById('startBtn').innerText = 'Start'; }
+        function adjustTimer(amt) { timeLeft = Math.max(5, timeLeft + amt); updateTimerDisplay(); }
+        function setDuration(min) { timeLeft = min * 60; updateTimerDisplay(); document.getElementById('duration-menu').classList.toggle('hidden'); }
+        function toggleDurationMenu() { document.getElementById('duration-menu').classList.toggle('hidden'); }
+
+        function setExercise(type) {
+            document.getElementById('exercise-title').innerText = type === 'plank' ? 'Plank' : 'Push-ups';
+            document.getElementById('plank-view').classList.toggle('hidden', type !== 'plank');
+            document.getElementById('pushup-view').classList.toggle('hidden', type !== 'pushup');
+            document.getElementById('btn-plank').className = type === 'plank' ? "flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold" : "flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold";
+            document.getElementById('btn-pushup').className = type === 'pushup' ? "flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold" : "flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold";
+        }
+
+        function addLog(dateKey, exercise, count, timeTaken) {
+            let logs = completedDays[dateKey] || [];
+            const idx = logs.findIndex(l => l.exercise === exercise);
+            if (idx > -1) logs[idx] = { exercise, count, timeTaken }; else logs.push({ exercise, count, timeTaken });
+            completedDays[dateKey] = logs;
+            localStorage.setItem('plankDays', JSON.stringify(completedDays));
+            renderCalendar(); showDetailsForDate(dateKey);
+        }
+
+        function showDetailsForDate(dateKey) {
+            const logs = completedDays[dateKey] || [];
+            const list = document.getElementById('log-list');
+            const clearBtn = document.getElementById('clear-day-btn');
+            if (logs.length > 0) {
+                list.innerHTML = logs.map(l => `<div class="py-1 border-b flex justify-between"><div><span class="font-bold">${l.exercise}:</span> ${l.count}</div><span class="text-gray-400 text-xs italic">${l.timeTaken}</span></div>`).join('');
+                clearBtn.classList.remove('hidden');
+            } else { list.innerHTML = "No logs yet."; clearBtn.classList.add('hidden'); }
+        }
+
+        function renderCalendar() {
+            const cal = document.getElementById('calendar'); cal.innerHTML = '';
+            document.getElementById('month-name').innerText = currentMonth.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dateKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${i}`;
+                const logs = completedDays[dateKey] || [];
+                const d = document.createElement('div');
+                d.className = `p-2 border rounded-lg cursor-pointer hover:border-purple-300 ${logs.length > 0 ? 'day-done' : 'bg-gray-50'}`;
+                d.innerHTML = `<span>${i}</span>`;
+                d.onclick = () => { document.getElementById('modal-date').innerText = `Logging for ${i}`; document.getElementById('log-modal').dataset.date = dateKey; document.getElementById('log-modal').classList.remove('hidden'); showDetailsForDate(dateKey); };
+                cal.appendChild(d);
+            }
+        }
+
+        function changeMonth(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); }
+        function switchTab(t) { document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); document.getElementById('page-' + t).classList.add('active'); document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('text-purple-600', btn.innerText.toLowerCase() === t)); }
+        function saveWorkout() { addLog(`${new Date().getFullYear()}-${new Date().getMonth()}-${new Date().getDate()}`, document.getElementById('exercise-title').innerText, timeLeft, "Timer"); alert("Saved!"); stopTimer(); }
+        function saveManualEntry() { addLog(document.getElementById('log-modal').dataset.date, document.getElementById('modal-ex').value, document.getElementById('modal-count').value, document.getElementById('modal-time').value); document.getElementById('log-modal').classList.add('hidden'); }
+        function clearSelectedDay() { const dateKey = document.getElementById('log-modal').dataset.date; if (confirm("Discard all entries?")) { delete completedDays[dateKey]; localStorage.setItem('plankDays', JSON.stringify(completedDays)); renderCalendar(); showDetailsForDate(dateKey); } }
+        function openHistory() { switchTab('history'); const all = Object.values(completedDays).flat(); document.getElementById('stats-total').innerText = all.length; document.getElementById('stats-details').innerText = `Planks: ${all.filter(e => e.exercise === 'Plank').length} | Push-ups: ${all.filter(e => e.exercise === 'Push-ups').length}`; }
+        function clearData() { if (confirm("Reset everything?")) { localStorage.removeItem('plankDays'); completedDays = {}; renderCalendar(); alert("Cleared!"); } }
+        
+        renderCalendar();
+    </script>
+</body>
+</html>
