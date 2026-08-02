@@ -102,7 +102,7 @@
     </div>
 
     <!-- NAVIGATION -->
-    <nav class="fixed bottom-0 w-full bg-white border-t p-4 flex justify-around z-40 shadow-t-lg">
+    <nav class="fixed bottom-0 w-full bg-white border-t p-4 flex justify-around z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
         <button onclick="switchTab('tracker')" class="nav-btn font-bold text-purple-600 p-2">Tracker</button>
         <button onclick="switchTab('calendar')" class="nav-btn font-bold p-2">Calendar</button>
         <button onclick="openHistory()" class="nav-btn font-bold p-2">History</button>
@@ -110,7 +110,9 @@
 
      <script>
         let currentMonth = new Date();
+        currentMonth.setDate(1); // pin to the 1st so month math never overflows (e.g. Jan 31 + 1 month skipping Feb)
         let completedDays = JSON.parse(localStorage.getItem('plankDays') || '{}');
+        let defaultDuration = 60;
         let timeLeft = 60; 
         let timerId = null;
         let selectedDateKey = null;
@@ -138,18 +140,20 @@
         function stopTimer() { 
             clearInterval(timerId); 
             timerId = null; 
-            timeLeft = 60; 
+            timeLeft = defaultDuration; 
             updateTimerDisplay(); 
             document.getElementById('startBtn').innerText = 'Start'; 
         }
 
         function adjustTimer(amt) { 
             timeLeft = Math.max(5, timeLeft + amt); 
+            defaultDuration = timeLeft;
             updateTimerDisplay(); 
         }
 
         function setDuration(min) { 
-            timeLeft = min * 60; 
+            defaultDuration = min * 60;
+            timeLeft = defaultDuration; 
             updateTimerDisplay(); 
             document.getElementById('duration-menu').classList.toggle('hidden'); 
         }
