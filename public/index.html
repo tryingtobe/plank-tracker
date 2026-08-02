@@ -108,18 +108,57 @@
         <button onclick="openHistory()" class="nav-btn font-bold p-2">History</button>
     </nav>
 
-    <script>
+     <script>
         let currentMonth = new Date();
         let completedDays = JSON.parse(localStorage.getItem('plankDays') || '{}');
-        let timeLeft = 60; let timerId = null;
+        let timeLeft = 60; 
+        let timerId = null;
+        let selectedDateKey = null;
 
-        function updateTimerDisplay() { document.getElementById('timer').innerText = timeLeft; }
-        function toggleTimer() { if (timerId) { clearInterval(timerId); timerId = null; document.getElementById('startBtn').innerText = 'Resume'; } else { document.getElementById('startBtn').innerText = 'Pause'; timerId = setInterval(() => { timeLeft--; updateTimerDisplay(); if(timeLeft<=0) stopTimer(); }, 1000); } }
-        function stopTimer() { clearInterval(timerId); timerId = null; timeLeft = 60; updateTimerDisplay(); document.getElementById('startBtn').innerText = 'Start'; }
-        function adjustTimer(amt) { timeLeft = Math.max(5, timeLeft + amt); updateTimerDisplay(); }
-        function setDuration(min) { timeLeft = min * 60; updateTimerDisplay(); document.getElementById('duration-menu').classList.toggle('hidden'); }
-        function toggleDurationMenu() { document.getElementById('duration-menu').classList.toggle('hidden'); }
+        // --- TIMER FUNCTIONS ---
+        function updateTimerDisplay() { 
+            document.getElementById('timer').innerText = timeLeft; 
+        }
 
+        function toggleTimer() { 
+            if (timerId) { 
+                clearInterval(timerId); 
+                timerId = null; 
+                document.getElementById('startBtn').innerText = 'Resume'; 
+            } else { 
+                document.getElementById('startBtn').innerText = 'Pause'; 
+                timerId = setInterval(() => { 
+                    timeLeft--; 
+                    updateTimerDisplay(); 
+                    if (timeLeft <= 0) stopTimer(); 
+                }, 1000); 
+            } 
+        }
+
+        function stopTimer() { 
+            clearInterval(timerId); 
+            timerId = null; 
+            timeLeft = 60; 
+            updateTimerDisplay(); 
+            document.getElementById('startBtn').innerText = 'Start'; 
+        }
+
+        function adjustTimer(amt) { 
+            timeLeft = Math.max(5, timeLeft + amt); 
+            updateTimerDisplay(); 
+        }
+
+        function setDuration(min) { 
+            timeLeft = min * 60; 
+            updateTimerDisplay(); 
+            document.getElementById('duration-menu').classList.toggle('hidden'); 
+        }
+
+        function toggleDurationMenu() { 
+            document.getElementById('duration-menu').classList.toggle('hidden'); 
+        }
+
+        // --- EXERCISE SWITCHER ---
         function setExercise(type) {
             document.getElementById('exercise-title').innerText = type === 'plank' ? 'Plank' : 'Push-ups';
             document.getElementById('plank-view').classList.toggle('hidden', type !== 'plank');
@@ -128,48 +167,123 @@
             document.getElementById('btn-pushup').className = type === 'pushup' ? "flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold" : "flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold";
         }
 
+        // --- LOGGING & CALENDARPersist FUNCTIONS ---
         function addLog(dateKey, exercise, count, timeTaken) {
             let logs = completedDays[dateKey] || [];
             const idx = logs.findIndex(l => l.exercise === exercise);
-            if (idx > -1) logs[idx] = { exercise, count, timeTaken }; else logs.push({ exercise, count, timeTaken });
+            if (idx > -1) {
+                logs[idx] = { exercise, count, timeTaken };
+            } else {
+                logs.push({ exercise, count, timeTaken });
+            }
             completedDays[dateKey] = logs;
             localStorage.setItem('plankDays', JSON.stringify(completedDays));
-            renderCalendar(); showDetailsForDate(dateKey);
+            renderCalendar(); 
+            showDetailsForDate(dateKey);
         }
 
         function showDetailsForDate(dateKey) {
+            selectedDateKey = dateKey;
             const logs = completedDays[dateKey] || [];
             const list = document.getElementById('log-list');
             const clearBtn = document.getElementById('clear-day-btn');
+            
             if (logs.length > 0) {
                 list.innerHTML = logs.map(l => `<div class="py-1 border-b flex justify-between"><div><span class="font-bold">${l.exercise}:</span> ${l.count}</div><span class="text-gray-400 text-xs italic">${l.timeTaken}</span></div>`).join('');
                 clearBtn.classList.remove('hidden');
-            } else { list.innerHTML = "No logs yet."; clearBtn.classList.add('hidden'); }
+            } else { 
+                list.innerHTML = "No logs yet."; 
+                clearBtn.classList.add('hidden'); 
+            }
         }
 
         function renderCalendar() {
-            const cal = document.getElementById('calendar'); cal.innerHTML = '';
+            const cal = document.getElementById('calendar'); 
+            cal.innerHTML = '';
             document.getElementById('month-name').innerText = currentMonth.toLocaleDateString('default', { month: 'long', year: 'numeric' });
-            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-            for(let i = 1; i <= daysInMonth; i++) {
-                const dateKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${i}`;
+            
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                // Formats key as YYYY-MM-DD
+                const monthPad = String(month + 1).padStart(2, '0');
+                const dayPad = String(i).padStart(2, '0');
+                const dateKey = `${year}-${monthPad}-${dayPad}`;
+                
                 const logs = completedDays[dateKey] || [];
                 const d = document.createElement('div');
                 d.className = `p-2 border rounded-lg cursor-pointer hover:border-purple-300 ${logs.length > 0 ? 'day-done' : 'bg-gray-50'}`;
                 d.innerHTML = `<span>${i}</span>`;
-                d.onclick = () => { document.getElementById('modal-date').innerText = `Logging for ${i}`; document.getElementById('log-modal').dataset.date = dateKey; document.getElementById('log-modal').classList.remove('hidden'); showDetailsForDate(dateKey); };
+                
+                d.onclick = () => { 
+                    selectedDateKey = dateKey;
+                    document.getElementById('modal-date').innerText = `Logging for ${currentMonth.toLocaleDateString('default', { month: 'short' })} ${i}`; 
+                    document.getElementById('log-modal').dataset.date = dateKey; 
+                    document.getElementById('log-modal').classList.remove('hidden'); 
+                    showDetailsForDate(dateKey); 
+                };
                 cal.appendChild(d);
             }
         }
 
-        function changeMonth(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); }
-        function switchTab(t) { document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); document.getElementById('page-' + t).classList.add('active'); document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('text-purple-600', btn.innerText.toLowerCase() === t)); }
-        function saveWorkout() { addLog(`${new Date().getFullYear()}-${new Date().getMonth()}-${new Date().getDate()}`, document.getElementById('exercise-title').innerText, timeLeft, "Timer"); alert("Saved!"); stopTimer(); }
-        function saveManualEntry() { addLog(document.getElementById('log-modal').dataset.date, document.getElementById('modal-ex').value, document.getElementById('modal-count').value, document.getElementById('modal-time').value); document.getElementById('log-modal').classList.add('hidden'); }
-        function clearSelectedDay() { const dateKey = document.getElementById('log-modal').dataset.date; if (confirm("Discard all entries?")) { delete completedDays[dateKey]; localStorage.setItem('plankDays', JSON.stringify(completedDays)); renderCalendar(); showDetailsForDate(dateKey); } }
-        function openHistory() { switchTab('history'); const all = Object.values(completedDays).flat(); document.getElementById('stats-total').innerText = all.length; document.getElementById('stats-details').innerText = `Planks: ${all.filter(e => e.exercise === 'Plank').length} | Push-ups: ${all.filter(e => e.exercise === 'Push-ups').length}`; }
-        function clearData() { if (confirm("Reset everything?")) { localStorage.removeItem('plankDays'); completedDays = {}; renderCalendar(); alert("Cleared!"); } }
+        function changeMonth(delta) { 
+            currentMonth.setMonth(currentMonth.getMonth() + delta); 
+            renderCalendar(); 
+        }
+
+        function switchTab(t) { 
+            document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); 
+            document.getElementById('page-' + t).classList.add('active'); 
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('text-purple-600', btn.innerText.toLowerCase() === t)); 
+        }
+
+        function saveWorkout() { 
+            const now = new Date();
+            const year = now.getFullYear();
+            const monthPad = String(now.getMonth() + 1).padStart(2, '0');
+            const dayPad = String(now.getDate()).padStart(2, '0');
+            const todayKey = `${year}-${monthPad}-${dayPad}`;
+
+            addLog(todayKey, document.getElementById('exercise-title').innerText, `${timeLeft}s`, "Timer"); 
+            alert("Saved to Calendar!"); 
+            stopTimer(); 
+        }
+
+        function saveManualEntry() { 
+            const dateKey = document.getElementById('log-modal').dataset.date;
+            addLog(dateKey, document.getElementById('modal-ex').value, document.getElementById('modal-count').value, document.getElementById('modal-time').value); 
+            document.getElementById('log-modal').classList.add('hidden'); 
+        }
+
+        function clearSelectedDay() { 
+            if (!selectedDateKey) return;
+            if (confirm("Discard all entries for this day?")) { 
+                delete completedDays[selectedDateKey]; 
+                localStorage.setItem('plankDays', JSON.stringify(completedDays)); 
+                renderCalendar(); 
+                showDetailsForDate(selectedDateKey); 
+            } 
+        }
+
+        function openHistory() { 
+            switchTab('history'); 
+            const all = Object.values(completedDays).flat(); 
+            document.getElementById('stats-total').innerText = all.length; 
+            document.getElementById('stats-details').innerText = `Planks: ${all.filter(e => e.exercise === 'Plank').length} | Push-ups: ${all.filter(e => e.exercise === 'Push-ups').length}`; 
+        }
+
+        function clearData() { 
+            if (confirm("Reset everything?")) { 
+                localStorage.removeItem('plankDays'); 
+                completedDays = {}; 
+                renderCalendar(); 
+                alert("Cleared!"); 
+            } 
+        }
         
+        // Initial call
         renderCalendar();
     </script>
 </body>
