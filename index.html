@@ -1,223 +1,597 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PlankTracker</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lottie Web Player -->
-  <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Pro - Advanced Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MediaPipe Pose & Camera Scripts for Motion Recognition -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .nav-btn { transition: all 0.2s; }
+        body.modal-open { overflow: hidden; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans pb-12">
+<body class="pb-24 bg-gray-100 font-sans">
 
-  <div class="max-w-2xl mx-auto px-4 pt-8">
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
-      <h1 class="text-3xl font-extrabold tracking-tight text-amber-500">PlankTracker</h1>
-      <div class="flex gap-2">
-        <button onclick="exportData()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 font-medium">Export JSON</button>
-        <label class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 font-medium cursor-pointer">
-          Import JSON
-          <input type="file" id="importFile" onchange="importData(event)" class="hidden" accept=".json"/>
-        </label>
-      </div>
-    </header>
+    <!-- 1. TRACKER PAGE -->
+    <div id="page-tracker" class="tab-content active p-6 max-w-md mx-auto">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-gray-800">Workout Pro</h1>
+            <p class="text-gray-500">Track your daily progress</p>
+        </header>
 
-    <!-- Workout & Timer Card -->
-    <main class="grid gap-6">
-      <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700/50">
-        <!-- Lottie Visual Guide -->
-        <div class="w-full h-48 flex justify-center items-center bg-slate-900/50 rounded-xl mb-6 border border-slate-800">
-          <dotlottie-player 
-            src="https://lottie.host/9f506821-2e67-4d7a-8b39-a790f9b6e85c/fH4jA9P82s.json" 
-            background="transparent" 
-            speed="1" 
-            style="width: 180px; height: 180px;" 
-            loop 
-            autoplay>
-          </dotlottie-player>
+        <section class="text-center bg-purple-100 p-6 rounded-3xl mb-6 shadow-inner relative">
+            <div class="flex items-center justify-center gap-6 mb-4">
+                <button onclick="adjustTimer(-5)" class="w-12 h-12 bg-white rounded-full shadow-md font-bold text-lg">-5s</button>
+                <button onclick="toggleDurationMenu()" class="w-24 focus:outline-none">
+                    <div id="timer" class="text-5xl font-mono font-bold text-purple-700">60</div>
+                    <span class="text-[10px] text-purple-500 uppercase font-bold tracking-wider">Tap to edit</span>
+                </button>
+                <button onclick="adjustTimer(5)" class="w-12 h-12 bg-white rounded-full shadow-md font-bold text-lg">+5s</button>
+            </div>
+
+            <div id="duration-menu" class="hidden absolute top-24 left-4 right-4 bg-white p-4 rounded-2xl shadow-xl z-20">
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setDuration(1)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">1m</button>
+                    <button onclick="setDuration(5)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">5m</button>
+                    <button onclick="setDuration(10)" class="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm font-bold">10m</button>
+                </div>
+            </div>
+            
+            <div class="flex gap-4 justify-center">
+                <button onclick="toggleTimer()" id="startBtn" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold shadow-md">Start</button>
+                <button onclick="saveWorkout()" class="flex-1 py-3 bg-green-500 text-white rounded-2xl font-bold shadow-md">Save</button>
+                <button onclick="stopTimer()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold shadow-md">Reset</button>
+            </div>
+        </section>
+
+        <h1 id="exercise-title" class="text-2xl font-bold mb-4 text-center">Plank</h1>
+        
+        <!-- MOTION RECOGNITION CAMERA VIEW -->
+        <div class="w-full aspect-square bg-black rounded-3xl mb-4 shadow-sm relative overflow-hidden flex items-center justify-center">
+            <video id="webcam" class="absolute inset-0 w-full h-full object-cover -scale-x-100" autoplay playsinline></video>
+            <canvas id="output-canvas" class="absolute inset-0 w-full h-full -scale-x-100 pointer-events-none"></canvas>
+            <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
+                <p class="text-sm mb-3 font-medium">Enable camera to track posture & form motion</p>
+                <button onclick="initCamera()" class="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-purple-700">Start Camera</button>
+            </div>
         </div>
 
-        <!-- Timer Display -->
-        <div class="text-center mb-6">
-          <span id="timerDisplay" class="text-6xl font-mono font-bold tracking-wider text-amber-400">00:00</span>
+        <div class="flex gap-4 mb-6">
+            <button id="btn-plank" onclick="setExercise('plank')" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold">Plank</button>
+            <button id="btn-pushup" onclick="setExercise('pushup')" class="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold">Push-ups</button>
         </div>
 
-        <!-- Controls -->
-        <div class="flex justify-center gap-4 mb-6">
-          <button id="startBtn" onclick="toggleTimer()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20">
-            Start Timer
-          </button>
-          <button onclick="resetTimer()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-6 py-3 rounded-xl transition-all">
-            Reset
-          </button>
+        <!-- AI COACH CHAT SECTION -->
+        <div class="bg-white p-4 rounded-3xl shadow-sm border border-purple-100">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-700 flex items-center gap-2">🤖 Gemini Coach</h3>
+                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">Online</span>
+            </div>
+            
+            <div id="chat-messages" class="h-32 overflow-y-auto bg-gray-50 p-3 rounded-2xl mb-3 text-sm space-y-2">
+                <div class="text-gray-500 italic">"Hey! Ready for your workout? Turn on your camera and ask me for form tips!"</div>
+            </div>
+
+            <div class="flex gap-2">
+                <input type="text" id="chat-input" placeholder="Ask form tips (e.g. Is my form good?)" class="flex-1 p-2.5 text-sm border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400" onkeydown="if(event.key === 'Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()" class="bg-purple-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-purple-700">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CALENDAR PAGE -->
+    <div id="page-calendar" class="tab-content p-6 max-w-md mx-auto">
+        <header class="flex justify-between items-center mb-4">
+            <button onclick="changeMonth(-1)" class="p-2.5 bg-white rounded-xl shadow-sm font-bold text-sm hover:bg-gray-50">Prev</button>
+            <h1 id="month-name" class="text-lg font-extrabold text-gray-800"></h1>
+            <button onclick="changeMonth(1)" class="p-2.5 bg-white rounded-xl shadow-sm font-bold text-sm hover:bg-gray-50">Next</button>
+        </header>
+
+        <!-- Monthly Quick Stats Bar -->
+        <div class="bg-purple-600 text-white p-4 rounded-2xl mb-4 shadow-sm flex justify-around text-center">
+            <div>
+                <div id="month-active-days" class="text-2xl font-extrabold">0</div>
+                <div class="text-[10px] uppercase font-bold tracking-wider opacity-80">Active Days</div>
+            </div>
+            <div class="border-r border-purple-400/50"></div>
+            <div>
+                <div id="month-total-sessions" class="text-2xl font-extrabold">0</div>
+                <div class="text-[10px] uppercase font-bold tracking-wider opacity-80">Total Sessions</div>
+            </div>
         </div>
 
-        <!-- Log Entry Form -->
-        <form id="logForm" onsubmit="saveWorkout(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-slate-700/60 pt-6">
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Exercise</label>
-            <select id="exerciseType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
-              <option value="Plank">Plank</option>
-              <option value="Side Plank">Side Plank</option>
-              <option value="Push-ups">Push-ups</option>
+        <!-- Calendar Grid -->
+        <div class="bg-white p-4 rounded-3xl shadow-md">
+            <div class="grid grid-cols-7 gap-1 text-center font-bold text-xs text-gray-400 mb-2">
+                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+            </div>
+            <div class="grid grid-cols-7 gap-1.5 text-center" id="calendar"></div>
+        </div>
+    </div>
+
+    <!-- 3. HISTORY PAGE -->
+    <div id="page-history" class="tab-content p-6 max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Your Progress</h1>
+        <div class="bg-white p-6 rounded-3xl shadow-md text-center">
+            <div id="stats-total" class="text-5xl font-bold text-purple-600 mb-2">0</div>
+            <p class="text-gray-500 font-bold">Total Sessions</p>
+            <div id="stats-details" class="mt-6 text-sm font-bold text-gray-700 p-4 bg-gray-50 rounded-xl"></div>
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button onclick="exportData()" class="flex-1 py-3 bg-blue-500 text-white rounded-2xl font-bold text-xs">Export JSON</button>
+            <button onclick="clearData()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold text-xs">Reset All</button>
+        </div>
+    </div>
+
+    <!-- DAY DETAILS POP-UP MODAL -->
+    <div id="day-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-date-title" class="font-bold text-lg text-purple-800">Date Details</h3>
+                <button onclick="closeDayModal()" class="text-gray-400 hover:text-gray-600 font-bold text-lg">&times;</button>
+            </div>
+            
+            <div id="modal-log-list" class="text-sm text-gray-600 space-y-2 mb-4 max-h-60 overflow-y-auto"></div>
+
+            <div class="flex gap-2">
+                <button onclick="openModalForNew()" class="flex-1 bg-purple-100 text-purple-700 p-3 rounded-xl font-bold text-xs hover:bg-purple-200">+ Add Session</button>
+                <button id="modal-clear-day-btn" onclick="confirmClearSelectedDay()" class="hidden flex-1 bg-red-100 text-red-600 p-3 rounded-xl font-bold text-xs hover:bg-red-200">Clear Day</button>
+            </div>
+            <button onclick="closeDayModal()" class="w-full mt-2 bg-gray-100 text-gray-700 p-2.5 rounded-xl font-bold text-xs hover:bg-gray-200">Close</button>
+        </div>
+    </div>
+
+    <!-- ENTRY / EDIT MODAL -->
+    <div id="log-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+            <h2 class="font-bold text-lg mb-4 text-purple-800" id="modal-title">Workout Entry</h2>
+            
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Exercise Type</label>
+            <select id="modal-ex" onchange="updateModalLabels()" class="w-full p-3 mb-3 border rounded-xl bg-gray-50 font-medium">
+                <option value="Plank">Plank</option>
+                <option value="Push-ups">Push-ups</option>
             </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Duration / Reps</label>
-            <input type="text" id="exerciseDuration" placeholder="e.g. 60 sec or 20 reps" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500"/>
-          </div>
-          <div class="flex items-end">
-            <button type="submit" class="w-full bg-slate-700 hover:bg-amber-500 hover:text-slate-950 font-bold py-2 px-4 rounded-lg text-sm text-slate-100 transition-colors">
-              Log Session
-            </button>
-          </div>
-        </form>
-      </section>
 
-      <!-- History & Logs -->
-      <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700/50">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-slate-100">Workout History</h2>
-          <button onclick="clearHistory()" class="text-xs text-rose-400 hover:text-rose-300">Clear All</button>
+            <label id="modal-amount-label" class="block text-xs font-bold text-gray-500 uppercase mb-1">Duration (Seconds)</label>
+            <input type="number" id="modal-count" placeholder="e.g. 60" class="w-full p-3 mb-3 border rounded-xl font-medium">
+
+            <label id="modal-volume-label" class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Sets / Volume Target</label>
+            <input type="text" id="modal-time" placeholder="e.g. 3 Sets / High Volume" class="w-full p-3 mb-5 border rounded-xl font-medium">
+
+            <div class="flex gap-2">
+                <button onclick="saveModalEntry()" class="flex-1 bg-purple-600 text-white p-3 rounded-xl font-bold shadow-md hover:bg-purple-700">Save</button>
+                <button onclick="discardModalEntry()" class="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl font-bold hover:bg-gray-300">Discard</button>
+            </div>
         </div>
-        <div id="historyList" class="space-y-3 max-h-80 overflow-y-auto pr-1">
-          <!-- Dynamically Populated -->
+    </div>
+
+    <!-- CONFIRMATION MODAL -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl text-center">
+            <h2 class="font-bold text-lg mb-2 text-red-600">Are you sure?</h2>
+            <p id="confirm-message" class="text-sm text-gray-600 mb-6">Are you sure you want to delete this workout session?</p>
+            <div class="flex gap-2">
+                <button id="confirm-yes-btn" class="flex-1 bg-red-600 text-white p-3 rounded-xl font-bold shadow-md hover:bg-red-700">Yes, Delete</button>
+                <button onclick="closeConfirmModal()" class="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl font-bold hover:bg-gray-300">Cancel</button>
+            </div>
         </div>
-      </section>
-    </main>
-  </div>
+    </div>
 
-  <script>
-    let timerInterval = null;
-    let secondsElapsed = 0;
-    let isRunning = false;
+    <nav class="fixed bottom-0 w-full bg-white border-t p-4 flex justify-around z-40 shadow-t-lg">
+        <button onclick="switchTab('tracker')" class="nav-btn font-bold text-purple-600 p-2">Tracker</button>
+        <button onclick="switchTab('calendar')" class="nav-btn font-bold p-2">Calendar</button>
+        <button onclick="openHistory()" class="nav-btn font-bold p-2">History</button>
+    </nav>
 
-    // Local Storage Hydration
-    document.addEventListener("DOMContentLoaded", renderHistory);
+    <script>
+        /** APP CORE **/
+        let currentMonth = new Date();
+        let completedDays = JSON.parse(localStorage.getItem('plankDays') || '{}');
+        let timeLeft = 60; let timerId = null;
+        let activeSelectedDateKey = null;
+        let activeDisplayDateObj = null;
+        let editingLogIndex = null;
 
-    function toggleTimer() {
-      const btn = document.getElementById("startBtn");
-      if (!isRunning) {
-        isRunning = true;
-        btn.innerText = "Pause";
-        btn.classList.replace("bg-amber-500", "bg-rose-500");
-        btn.classList.replace("hover:bg-amber-600", "hover:bg-rose-600");
-        timerInterval = setInterval(() => {
-          secondsElapsed++;
-          updateTimerUI();
-        }, 1000);
-      } else {
-        pauseTimer();
-      }
-    }
+        function updateTimerDisplay() { document.getElementById('timer').innerText = timeLeft; }
+        function toggleTimer() { if (timerId) { clearInterval(timerId); timerId = null; document.getElementById('startBtn').innerText = 'Resume'; } else { document.getElementById('startBtn').innerText = 'Pause'; timerId = setInterval(() => { timeLeft--; updateTimerDisplay(); if(timeLeft<=0) stopTimer(); }, 1000); } }
+        function stopTimer() { clearInterval(timerId); timerId = null; timeLeft = 60; updateTimerDisplay(); document.getElementById('startBtn').innerText = 'Start'; }
+        function adjustTimer(amt) { timeLeft = Math.max(5, timeLeft + amt); updateTimerDisplay(); }
+        function setDuration(min) { timeLeft = min * 60; updateTimerDisplay(); document.getElementById('duration-menu').classList.toggle('hidden'); }
+        function toggleDurationMenu() { document.getElementById('duration-menu').classList.toggle('hidden'); }
 
-    function pauseTimer() {
-      isRunning = false;
-      clearInterval(timerInterval);
-      const btn = document.getElementById("startBtn");
-      btn.innerText = "Resume";
-      btn.classList.replace("bg-rose-500", "bg-amber-500");
-      btn.classList.replace("hover:bg-rose-600", "hover:bg-amber-600");
-    }
-
-    function resetTimer() {
-      pauseTimer();
-      secondsElapsed = 0;
-      updateTimerUI();
-      document.getElementById("startBtn").innerText = "Start Timer";
-    }
-
-    function updateTimerUI() {
-      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-      const secs = String(secondsElapsed % 60).padStart(2, '0');
-      document.getElementById("timerDisplay").innerText = `${mins}:${secs}`;
-    }
-
-    function getLogs() {
-      return JSON.parse(localStorage.getItem("plankTrackerLogs") || "[]");
-    }
-
-    function saveWorkout(e) {
-      e.preventDefault();
-      const exercise = document.getElementById("exerciseType").value;
-      const duration = document.getElementById("exerciseDuration").value;
-      const newLog = {
-        id: Date.now(),
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-        exercise,
-        duration
-      };
-
-      const logs = [newLog, ...getLogs()];
-      localStorage.setItem("plankTrackerLogs", JSON.stringify(logs));
-      document.getElementById("logForm").reset();
-      renderHistory();
-    }
-
-    function deleteLog(id) {
-      const logs = getLogs().filter(log => log.id !== id);
-      localStorage.setItem("plankTrackerLogs", JSON.stringify(logs));
-      renderHistory();
-    }
-
-    function clearHistory() {
-      if (confirm("Are you sure you want to clear your workout history?")) {
-        localStorage.removeItem("plankTrackerLogs");
-        renderHistory();
-      }
-    }
-
-    function renderHistory() {
-      const container = document.getElementById("historyList");
-      const logs = getLogs();
-
-      if (logs.length === 0) {
-        container.innerHTML = `<p class="text-sm text-slate-500 text-center py-6">No workouts logged yet. Hit start or submit a record!</p>`;
-        return;
-      }
-
-      container.innerHTML = logs.map(log => `
-        <div class="flex justify-between items-center bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
-          <div>
-            <span class="text-xs text-amber-500 font-semibold block">${log.date}</span>
-            <span class="text-sm font-medium text-slate-200">${log.exercise}</span>
-          </div>
-          <div class="flex items-center gap-3">
-            <span class="text-sm font-mono bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">${log.duration}</span>
-            <button onclick="deleteLog(${log.id})" class="text-slate-500 hover:text-rose-400 text-xs">✕</button>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function exportData() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(localStorage.getItem("plankTrackerLogs") || "[]");
-      const dlAnchor = document.createElement('a');
-      dlAnchor.setAttribute("href", dataStr);
-      dlAnchor.setAttribute("download", `plank_tracker_backup_${Date.now()}.json`);
-      document.body.appendChild(dlAnchor);
-      dlAnchor.click();
-      dlAnchor.remove();
-    }
-
-    function importData(e) {
-      const fileReader = new FileReader();
-      fileReader.onload = function(event) {
-        try {
-          const parsed = JSON.parse(event.target.result);
-          if (Array.isArray(parsed)) {
-            localStorage.setItem("plankTrackerLogs", JSON.stringify(parsed));
-            renderHistory();
-            alert("Data imported successfully!");
-          }
-        } catch (err) {
-          alert("Invalid JSON file format.");
+        /** LOGGING & EDITING LOGIC **/
+        function addLog(dateKey, exercise, count, timeTaken) {
+            let logs = completedDays[dateKey] || [];
+            logs.push({ exercise, count, timeTaken });
+            completedDays[dateKey] = logs;
+            localStorage.setItem('plankDays', JSON.stringify(completedDays));
+            renderCalendar(); 
+            if(activeSelectedDateKey === dateKey) showDetailsForDate(dateKey, activeDisplayDateObj);
         }
-      };
-      fileReader.readAsText(e.target.files[0]);
-    }
-  </script>
+
+        function updateLogAtIndex(dateKey, index, exercise, count, timeTaken) {
+            let logs = completedDays[dateKey] || [];
+            if (logs[index]) {
+                logs[index] = { exercise, count, timeTaken };
+                completedDays[dateKey] = logs;
+                localStorage.setItem('plankDays', JSON.stringify(completedDays));
+                renderCalendar();
+                showDetailsForDate(dateKey, activeDisplayDateObj);
+            }
+        }
+
+        function promptDeleteLog(dateKey, index) {
+            const logs = completedDays[dateKey] || [];
+            const log = logs[index];
+            if (!log) return;
+
+            document.getElementById('confirm-message').innerText = `Are you sure you want to delete this ${log.exercise} session?`;
+            document.getElementById('confirm-yes-btn').onclick = function() {
+                deleteLogAtIndex(dateKey, index);
+                closeConfirmModal();
+            };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function deleteLogAtIndex(dateKey, index) {
+            let logs = completedDays[dateKey] || [];
+            logs.splice(index, 1);
+            if (logs.length > 0) {
+                completedDays[dateKey] = logs;
+            } else {
+                delete completedDays[dateKey];
+            }
+            localStorage.setItem('plankDays', JSON.stringify(completedDays));
+            renderCalendar();
+            showDetailsForDate(dateKey, activeDisplayDateObj);
+        }
+
+        function showDetailsForDate(dateKey, displayDate) {
+            activeSelectedDateKey = dateKey;
+            activeDisplayDateObj = displayDate;
+            
+            const logs = completedDays[dateKey] || [];
+            const list = document.getElementById('modal-log-list');
+            const clearBtn = document.getElementById('modal-clear-day-btn');
+            const titleEl = document.getElementById('modal-date-title');
+
+            titleEl.innerText = displayDate.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+
+            if (logs.length > 0) {
+                list.innerHTML = logs.map((l, idx) => {
+                    const labelUnit = l.exercise === 'Plank' ? 'seconds' : 'reps';
+                    return `
+                        <div class="py-2.5 px-3 bg-purple-50 rounded-2xl flex justify-between items-center shadow-sm">
+                            <div>
+                                <span class="font-extrabold text-purple-900">${l.exercise}</span>
+                                <div class="text-xs text-purple-600 font-medium">${l.count} ${labelUnit} | Volume: ${l.timeTaken}</div>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <button onclick="openModalForEdit('${dateKey}', ${idx})" class="text-xs bg-white text-purple-700 px-2 py-1 rounded-xl font-bold shadow-sm hover:bg-purple-100">Edit</button>
+                                <button onclick="promptDeleteLog('${dateKey}', ${idx})" class="text-xs bg-white text-red-600 px-2 py-1 rounded-xl font-bold shadow-sm hover:bg-red-50">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                clearBtn.classList.remove('hidden');
+            } else { 
+                list.innerHTML = `<div class="text-gray-400 italic py-2 text-center">No workout records for this date. Click "+ Add Session" below!</div>`; 
+                clearBtn.classList.add('hidden'); 
+            }
+
+            document.getElementById('day-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeDayModal() {
+            document.getElementById('day-modal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        /** MODAL WORKFLOW **/
+        function updateModalLabels() {
+            const exercise = document.getElementById('modal-ex').value;
+            const amountLabel = document.getElementById('modal-amount-label');
+            const amountInput = document.getElementById('modal-count');
+            const volumeLabel = document.getElementById('modal-volume-label');
+            const volumeInput = document.getElementById('modal-time');
+
+            if (exercise === 'Plank') {
+                amountLabel.innerText = "Duration (Seconds)";
+                amountInput.placeholder = "e.g. 60";
+                volumeLabel.innerText = "Plank Sets / Core Workload";
+                volumeInput.placeholder = "e.g. 3 Sets / Max Effort";
+            } else {
+                amountLabel.innerText = "Repetitions (Reps)";
+                amountInput.placeholder = "e.g. 25";
+                volumeLabel.innerText = "Push-up Sets / Volume Split";
+                volumeInput.placeholder = "e.g. 4 Sets / Hypertrophy Pace";
+            }
+        }
+
+        function openModalForNew() {
+            if (!activeSelectedDateKey) {
+                const today = new Date();
+                activeSelectedDateKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+                activeDisplayDateObj = today;
+            }
+            editingLogIndex = null;
+            document.getElementById('modal-title').innerText = "Add Session Entry";
+            document.getElementById('modal-ex').value = "Plank";
+            document.getElementById('modal-count').value = "";
+            document.getElementById('modal-time').value = "";
+            updateModalLabels();
+            document.getElementById('log-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function openModalForEdit(dateKey, index) {
+            editingLogIndex = index;
+            const logs = completedDays[dateKey] || [];
+            const log = logs[index];
+            if (!log) return;
+
+            document.getElementById('modal-title').innerText = "Edit Session";
+            document.getElementById('modal-ex').value = log.exercise;
+            document.getElementById('modal-count').value = log.count;
+            document.getElementById('modal-time').value = log.timeTaken;
+            updateModalLabels();
+            document.getElementById('log-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function saveModalEntry() {
+            const exercise = document.getElementById('modal-ex').value;
+            const count = document.getElementById('modal-count').value || '0';
+            const timeTaken = document.getElementById('modal-time').value || 'Standard Set';
+
+            if (!activeSelectedDateKey) return;
+
+            if (editingLogIndex === null) {
+                addLog(activeSelectedDateKey, exercise, count, timeTaken);
+            } else {
+                updateLogAtIndex(activeSelectedDateKey, editingLogIndex, exercise, count, timeTaken);
+            }
+            document.getElementById('log-modal').classList.add('hidden');
+        }
+
+        function discardModalEntry() {
+            document.getElementById('log-modal').classList.add('hidden');
+        }
+
+        function confirmClearSelectedDay() {
+            if (!activeSelectedDateKey) return;
+            document.getElementById('confirm-message').innerText = "Are you sure you want to clear all workout sessions for this day?";
+            document.getElementById('confirm-yes-btn').onclick = function() {
+                delete completedDays[activeSelectedDateKey];
+                localStorage.setItem('plankDays', JSON.stringify(completedDays));
+                renderCalendar();
+                showDetailsForDate(activeSelectedDateKey, activeDisplayDateObj);
+                closeConfirmModal();
+            };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        /** ENHANCED CALENDAR UI **/
+        function renderCalendar() {
+            const cal = document.getElementById('calendar'); 
+            cal.innerHTML = '';
+            
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+
+            document.getElementById('month-name').innerText = currentMonth.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            let activeDaysCount = 0;
+            let totalMonthSessions = 0;
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dateKey = `${year}-${month}-${i}`;
+                const logs = completedDays[dateKey] || [];
+                if(logs.length > 0) {
+                    activeDaysCount++;
+                    totalMonthSessions += logs.length;
+                }
+            }
+
+            document.getElementById('month-active-days').innerText = activeDaysCount;
+            document.getElementById('month-total-sessions').innerText = totalMonthSessions;
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = "h-16 bg-transparent";
+                cal.appendChild(emptyCell);
+            }
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dateKey = `${year}-${month}-${i}`;
+                const logs = completedDays[dateKey] || [];
+                const isCompleted = logs.length > 0;
+
+                const d = document.createElement('div');
+                d.className = `h-16 p-1 border rounded-2xl flex flex-col justify-between cursor-pointer transition-all ${isCompleted ? 'bg-purple-100 border-purple-300 shadow-sm' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`;
+                
+                let badgesHtml = logs.map(l => {
+                    const unit = l.exercise === 'Plank' ? 's' : 'r';
+                    return `<span class="text-[9px] bg-purple-600 text-white px-1 rounded truncate block">${l.exercise}: ${l.count}${unit}</span>`;
+                }).join('');
+
+                d.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold ${isCompleted ? 'text-purple-900 font-extrabold' : 'text-gray-600'}">${i}</span>
+                        ${isCompleted ? '<span class="w-1.5 h-1.5 bg-purple-600 rounded-full"></span>' : ''}
+                    </div>
+                    <div class="space-y-0.5 overflow-hidden">${badgesHtml}</div>
+                `;
+
+                const targetDate = new Date(year, month, i);
+                d.onclick = () => showDetailsForDate(dateKey, targetDate);
+                cal.appendChild(d);
+            }
+        }
+
+        /** UI & ACTIONS **/
+        function changeMonth(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); }
+        function switchTab(t) { document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active')); document.getElementById('page-' + t).classList.add('active'); document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('text-purple-600', btn.innerText.toLowerCase() === t)); }
+        
+        function setExercise(type) {
+            document.getElementById('exercise-title').innerText = type === 'plank' ? 'Plank' : 'Push-ups';
+            document.getElementById('btn-plank').className = type === 'plank' ? "flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold" : "flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold";
+            document.getElementById('btn-pushup').className = type === 'pushup' ? "flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold" : "flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold";
+        }
+
+        function saveWorkout() { 
+            const today = new Date();
+            const exerciseType = document.getElementById('exercise-title').innerText;
+            const volumeLabel = exerciseType === 'Plank' ? "Timed Plank Session" : "Dynamic Push-up Set";
+            
+            addLog(`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`, exerciseType, timeLeft, volumeLabel); 
+            alert("Workout automatically saved to calendar!"); 
+            stopTimer(); 
+        }
+        
+        function exportData() { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(completedDays)); a.download = "workout_data.json"; a.click(); }
+        function openHistory() { switchTab('history'); const all = Object.values(completedDays).flat(); document.getElementById('stats-total').innerText = all.length; document.getElementById('stats-details').innerText = `Planks: ${all.filter(e => e.exercise === 'Plank').length} | Push-ups: ${all.filter(e => e.exercise === 'Push-ups').length}`; }
+        function clearData() { if (confirm("Reset all history?")) { localStorage.removeItem('plankDays'); completedDays = {}; renderCalendar(); alert("Cleared!"); } }
+
+        /** MOTION RECOGNITION (MEDIAPIPE POSE) **/
+        function initCamera() {
+            document.getElementById('camera-placeholder').classList.add('hidden');
+            const videoElement = document.getElementById('webcam');
+            const canvasElement = document.getElementById('output-canvas');
+            const canvasCtx = canvasElement.getContext('2d');
+
+            const pose = new Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults((results) => {
+                canvasElement.width = videoElement.videoWidth || 480;
+                canvasElement.height = videoElement.videoHeight || 480;
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                
+                if (results.poseLandmarks) {
+                    for (const landmark of results.poseLandmarks) {
+                        const x = landmark.x * canvasElement.width;
+                        const y = landmark.y * canvasElement.height;
+                        canvasCtx.fillStyle = '#c084fc';
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(x, y, 4, 0, 2 * Math.PI);
+                        canvasCtx.fill();
+                    }
+                }
+                canvasCtx.restore();
+            });
+
+            const camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await pose.send({ image: videoElement });
+                },
+                width: 480,
+                height: 480
+            });
+            camera.start();
+        }
+
+        /** GEMINI CHAT INTEGRATION WITH WEBCAM VISION **/
+        async function sendChatMessage() {
+            const inputField = document.getElementById('chat-input');
+            const chatMessages = document.getElementById('chat-messages');
+            const userText = inputField.value.trim();
+
+            if (!userText) return;
+
+            chatMessages.innerHTML += `<div class="text-right"><span class="inline-block bg-purple-600 text-white px-3 py-1.5 rounded-2xl text-xs max-w-[80%] text-left">${userText}</span></div>`;
+            inputField.value = '';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            const typingId = 'typing-' + Date.now();
+            chatMessages.innerHTML += `<div id="${typingId}" class="text-left"><span class="inline-block bg-gray-200 text-gray-600 px-3 py-1.5 rounded-2xl text-xs">Coach is analyzing your form...</span></div>`;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const apiKey = "YOUR_GEMINI_API_KEY"; // Replace with your actual Gemini API key
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+                const currentExercise = document.getElementById('exercise-title').innerText;
+                const systemPrompt = `You are an expert, encouraging fitness trainer AI in a workout app called Workout Pro. The user is currently performing: ${currentExercise}. Look closely at the provided image of the user to evaluate their physical form, posture, or alignment. Give concise, direct, and helpful coaching advice based on what you actually see.`;
+
+                const videoElement = document.getElementById('webcam');
+                let imagePart = null;
+
+                if (videoElement && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoElement.videoWidth || 480;
+                    canvas.height = videoElement.videoHeight || 480;
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    
+                    const base64Data = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                    
+                    imagePart = {
+                        inline_data: {
+                            mime_type: "image/jpeg",
+                            data: base64Data
+                        }
+                    };
+                }
+
+                const partsArray = [{ text: systemPrompt + "\n\nUser Question: " + userText }];
+                if (imagePart) {
+                    partsArray.push(imagePart);
+                }
+
+                const payload = {
+                    contents: [{ role: "user", parts: partsArray }]
+                };
+
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Keep your core tight and maintain your form!";
+
+                document.getElementById(typingId).remove();
+                chatMessages.innerHTML += `<div class="text-left"><span class="inline-block bg-purple-100 text-purple-900 px-3 py-1.5 rounded-2xl text-xs max-w-[80%]">${aiReply}</span></div>`;
+            } catch (error) {
+                console.error("Chat error:", error);
+                document.getElementById(typingId).remove();
+                chatMessages.innerHTML += `<div class="text-left"><span class="inline-block bg-red-100 text-red-600 px-3 py-1.5 rounded-2xl text-xs">Oops, couldn't reach the coach. Try again!</span></div>`;
+            }
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        renderCalendar();
+    </script>
 </body>
 </html>
