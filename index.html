@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PlankTracker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lottie Web Player -->
+  <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans pb-12">
+
+  <div class="max-w-2xl mx-auto px-4 pt-8">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+      <h1 class="text-3xl font-extrabold tracking-tight text-amber-500">PlankTracker</h1>
+      <div class="flex gap-2">
+        <button onclick="exportData()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 font-medium">Export JSON</button>
+        <label class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 font-medium cursor-pointer">
+          Import JSON
+          <input type="file" id="importFile" onchange="importData(event)" class="hidden" accept=".json"/>
+        </label>
+      </div>
+    </header>
+
+    <!-- Workout & Timer Card -->
+    <main class="grid gap-6">
+      <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700/50">
+        <!-- Lottie Visual Guide -->
+        <div class="w-full h-48 flex justify-center items-center bg-slate-900/50 rounded-xl mb-6 border border-slate-800">
+          <dotlottie-player 
+            src="https://lottie.host/9f506821-2e67-4d7a-8b39-a790f9b6e85c/fH4jA9P82s.json" 
+            background="transparent" 
+            speed="1" 
+            style="width: 180px; height: 180px;" 
+            loop 
+            autoplay>
+          </dotlottie-player>
+        </div>
+
+        <!-- Timer Display -->
+        <div class="text-center mb-6">
+          <span id="timerDisplay" class="text-6xl font-mono font-bold tracking-wider text-amber-400">00:00</span>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-center gap-4 mb-6">
+          <button id="startBtn" onclick="toggleTimer()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20">
+            Start Timer
+          </button>
+          <button onclick="resetTimer()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-6 py-3 rounded-xl transition-all">
+            Reset
+          </button>
+        </div>
+
+        <!-- Log Entry Form -->
+        <form id="logForm" onsubmit="saveWorkout(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-slate-700/60 pt-6">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Exercise</label>
+            <select id="exerciseType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+              <option value="Plank">Plank</option>
+              <option value="Side Plank">Side Plank</option>
+              <option value="Push-ups">Push-ups</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Duration / Reps</label>
+            <input type="text" id="exerciseDuration" placeholder="e.g. 60 sec or 20 reps" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500"/>
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-slate-700 hover:bg-amber-500 hover:text-slate-950 font-bold py-2 px-4 rounded-lg text-sm text-slate-100 transition-colors">
+              Log Session
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- History & Logs -->
+      <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700/50">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-slate-100">Workout History</h2>
+          <button onclick="clearHistory()" class="text-xs text-rose-400 hover:text-rose-300">Clear All</button>
+        </div>
+        <div id="historyList" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+          <!-- Dynamically Populated -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let timerInterval = null;
+    let secondsElapsed = 0;
+    let isRunning = false;
+
+    // Local Storage Hydration
+    document.addEventListener("DOMContentLoaded", renderHistory);
+
+    function toggleTimer() {
+      const btn = document.getElementById("startBtn");
+      if (!isRunning) {
+        isRunning = true;
+        btn.innerText = "Pause";
+        btn.classList.replace("bg-amber-500", "bg-rose-500");
+        btn.classList.replace("hover:bg-amber-600", "hover:bg-rose-600");
+        timerInterval = setInterval(() => {
+          secondsElapsed++;
+          updateTimerUI();
+        }, 1000);
+      } else {
+        pauseTimer();
+      }
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      const btn = document.getElementById("startBtn");
+      btn.innerText = "Resume";
+      btn.classList.replace("bg-rose-500", "bg-amber-500");
+      btn.classList.replace("hover:bg-rose-600", "hover:bg-amber-600");
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      secondsElapsed = 0;
+      updateTimerUI();
+      document.getElementById("startBtn").innerText = "Start Timer";
+    }
+
+    function updateTimerUI() {
+      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+      const secs = String(secondsElapsed % 60).padStart(2, '0');
+      document.getElementById("timerDisplay").innerText = `${mins}:${secs}`;
+    }
+
+    function getLogs() {
+      return JSON.parse(localStorage.getItem("plankTrackerLogs") || "[]");
+    }
+
+    function saveWorkout(e) {
+      e.preventDefault();
+      const exercise = document.getElementById("exerciseType").value;
+      const duration = document.getElementById("exerciseDuration").value;
+      const newLog = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+        exercise,
+        duration
+      };
+
+      const logs = [newLog, ...getLogs()];
+      localStorage.setItem("plankTrackerLogs", JSON.stringify(logs));
+      document.getElementById("logForm").reset();
+      renderHistory();
+    }
+
+    function deleteLog(id) {
+      const logs = getLogs().filter(log => log.id !== id);
+      localStorage.setItem("plankTrackerLogs", JSON.stringify(logs));
+      renderHistory();
+    }
+
+    function clearHistory() {
+      if (confirm("Are you sure you want to clear your workout history?")) {
+        localStorage.removeItem("plankTrackerLogs");
+        renderHistory();
+      }
+    }
+
+    function renderHistory() {
+      const container = document.getElementById("historyList");
+      const logs = getLogs();
+
+      if (logs.length === 0) {
+        container.innerHTML = `<p class="text-sm text-slate-500 text-center py-6">No workouts logged yet. Hit start or submit a record!</p>`;
+        return;
+      }
+
+      container.innerHTML = logs.map(log => `
+        <div class="flex justify-between items-center bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
+          <div>
+            <span class="text-xs text-amber-500 font-semibold block">${log.date}</span>
+            <span class="text-sm font-medium text-slate-200">${log.exercise}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-mono bg-slate-800 text-slate-300 px-2 py-1 rounded border border-slate-700">${log.duration}</span>
+            <button onclick="deleteLog(${log.id})" class="text-slate-500 hover:text-rose-400 text-xs">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(localStorage.getItem("plankTrackerLogs") || "[]");
+      const dlAnchor = document.createElement('a');
+      dlAnchor.setAttribute("href", dataStr);
+      dlAnchor.setAttribute("download", `plank_tracker_backup_${Date.now()}.json`);
+      document.body.appendChild(dlAnchor);
+      dlAnchor.click();
+      dlAnchor.remove();
+    }
+
+    function importData(e) {
+      const fileReader = new FileReader();
+      fileReader.onload = function(event) {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem("plankTrackerLogs", JSON.stringify(parsed));
+            renderHistory();
+            alert("Data imported successfully!");
+          }
+        } catch (err) {
+          alert("Invalid JSON file format.");
+        }
+      };
+      fileReader.readAsText(e.target.files[0]);
+    }
+  </script>
+</body>
+</html>
