@@ -24,7 +24,19 @@
             <p class="text-gray-500">Track your daily progress</p>
         </header>
 
-        <section class="text-center bg-purple-100 p-6 rounded-3xl mb-6 shadow-inner relative">
+        <!-- REST TIMER SECTION (HIDDEN BY DEFAULT) -->
+        <div id="rest-container" class="hidden bg-blue-50 border border-blue-200 p-6 rounded-3xl mb-6 text-center shadow-sm relative">
+            <span class="text-xs uppercase font-extrabold tracking-wider text-blue-600 bg-blue-100 px-3 py-1 rounded-full">Rest Period</span>
+            <div id="rest-timer" class="text-5xl font-mono font-bold text-blue-700 my-3">120</div>
+            <p class="text-xs text-blue-500 font-medium mb-4">Catch your breath! Adjust time or skip.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="adjustRestTimer(-15)" class="px-3 py-2 bg-white rounded-xl shadow-xs font-bold text-xs text-blue-700">-15s</button>
+                <button onclick="adjustRestTimer(15)" class="px-3 py-2 bg-white rounded-xl shadow-xs font-bold text-xs text-blue-700">+15s</button>
+                <button onclick="skipRest()" class="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-md hover:bg-blue-700">Skip Rest</button>
+            </div>
+        </div>
+
+        <section id="workout-timer-card" class="text-center bg-purple-100 p-6 rounded-3xl mb-6 shadow-inner relative">
             <div class="flex items-center justify-center gap-6 mb-4">
                 <button onclick="adjustTimer(-5)" class="w-12 h-12 bg-white rounded-full shadow-md font-bold text-lg">-5s</button>
                 <button onclick="toggleDurationMenu()" class="w-24 focus:outline-none">
@@ -43,9 +55,9 @@
             </div>
             
             <div class="flex gap-4 justify-center">
-                <button onclick="toggleTimer()" id="startBtn" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold shadow-md">Start</button>
-                <button onclick="saveWorkout()" class="flex-1 py-3 bg-green-500 text-white rounded-2xl font-bold shadow-md">Save</button>
-                <button onclick="stopTimer()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold shadow-md">Reset</button>
+                <button onclick="saveWorkout()" class="flex-1 py-3 bg-purple-600 text-white rounded-2xl font-bold shadow-md hover:bg-purple-700">Save</button>
+                <button onclick="toggleTimer()" id="startBtn" class="flex-1 py-3 bg-green-500 text-white rounded-2xl font-bold shadow-md hover:bg-green-600">Start</button>
+                <button onclick="stopTimer()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold shadow-md hover:bg-red-600">Reset</button>
             </div>
         </section>
 
@@ -106,23 +118,47 @@
         </div>
 
         <!-- Calendar Grid -->
-        <div class="bg-white p-4 rounded-3xl shadow-md">
+        <div class="bg-white p-4 rounded-3xl shadow-md mb-6">
             <div class="grid grid-cols-7 gap-1 text-center font-bold text-xs text-gray-400 mb-2">
                 <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
             </div>
             <div class="grid grid-cols-7 gap-1.5 text-center" id="calendar"></div>
+        </div>
+
+        <!-- Monthly History Log Breakdown Container -->
+        <div class="bg-white p-5 rounded-3xl shadow-md">
+            <h3 class="font-bold text-gray-800 text-base mb-3 flex items-center justify-between">
+                <span>📅 Month Activity Feed</span>
+                <span id="month-feed-label" class="text-xs font-normal text-purple-600"></span>
+            </h3>
+            <div id="monthly-history-feed" class="space-y-2.5 max-h-72 overflow-y-auto pr-1 text-sm">
+                <!-- Dynamically populated via renderCalendar() -->
+            </div>
         </div>
     </div>
 
     <!-- 3. HISTORY PAGE -->
     <div id="page-history" class="tab-content p-6 max-w-md mx-auto">
         <h1 class="text-2xl font-bold mb-6">Your Progress</h1>
-        <div class="bg-white p-6 rounded-3xl shadow-md text-center">
+        
+        <div class="bg-white p-6 rounded-3xl shadow-md text-center mb-6">
             <div id="stats-total" class="text-5xl font-bold text-purple-600 mb-2">0</div>
             <p class="text-gray-500 font-bold">Total Sessions</p>
             <div id="stats-details" class="mt-6 text-sm font-bold text-gray-700 p-4 bg-gray-50 rounded-xl"></div>
         </div>
-        <div class="flex gap-2 mt-4">
+
+        <!-- MILESTONE BADGES SECTION -->
+        <div class="bg-white p-6 rounded-3xl shadow-md mb-6">
+            <h3 class="font-bold text-gray-800 text-base mb-4 flex items-center justify-between">
+                <span>🏆 Milestone Badges</span>
+                <span id="badge-counter" class="text-xs font-bold bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full">0/5 Unlocked</span>
+            </h3>
+            <div id="badges-grid" class="grid grid-cols-2 gap-3">
+                <!-- Dynamically populated via renderHistory() -->
+            </div>
+        </div>
+
+        <div class="flex gap-2">
             <button onclick="exportData()" class="flex-1 py-3 bg-blue-500 text-white rounded-2xl font-bold text-xs">Export JSON</button>
             <button onclick="clearData()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold text-xs">Reset All</button>
         </div>
@@ -193,16 +229,152 @@
         let currentMonth = new Date();
         let completedDays = JSON.parse(localStorage.getItem('plankDays') || '{}');
         let timeLeft = 60; let timerId = null;
+        let restTimeLeft = 120; let restTimerId = null;
         let activeSelectedDateKey = null;
         let activeDisplayDateObj = null;
         let editingLogIndex = null;
 
         function updateTimerDisplay() { document.getElementById('timer').innerText = timeLeft; }
-        function toggleTimer() { if (timerId) { clearInterval(timerId); timerId = null; document.getElementById('startBtn').innerText = 'Resume'; } else { document.getElementById('startBtn').innerText = 'Pause'; timerId = setInterval(() => { timeLeft--; updateTimerDisplay(); if(timeLeft<=0) stopTimer(); }, 1000); } }
-        function stopTimer() { clearInterval(timerId); timerId = null; timeLeft = 60; updateTimerDisplay(); document.getElementById('startBtn').innerText = 'Start'; }
+        function updateRestTimerDisplay() { document.getElementById('rest-timer').innerText = restTimeLeft; }
+
+        /** AUDIO VOICE SYNTHESIS HELPER (Cheerful Female Persona) **/
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                utterance.rate = 1.05; 
+                utterance.pitch = 1.3; 
+
+                const voices = window.speechSynthesis.getVoices();
+                const femaleVoice = voices.find(v => 
+                    v.name.toLowerCase().includes('female') || 
+                    v.name.toLowerCase().includes('zira') || 
+                    v.name.toLowerCase().includes('samantha') ||
+                    v.name.toLowerCase().includes('karen') ||
+                    v.name.toLowerCase().includes('google uk english female')
+                );
+                
+                if (femaleVoice) {
+                    utterance.voice = femaleVoice;
+                }
+
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+
+        /** DEBUG-FRIENDLY ROBUST TIMER TOGGLE **/
+        function toggleTimer() { 
+            const startBtn = document.getElementById('startBtn');
+            if (!startBtn) {
+                console.error("Start button element not found!");
+                return;
+            }
+
+            if (timerId) { 
+                clearInterval(timerId); 
+                timerId = null; 
+                startBtn.innerText = 'Resume'; 
+            } else { 
+                if (startBtn.innerText === 'Start' || startBtn.innerText === 'Resume') {
+                    startBtn.innerText = 'Pause';
+                    playCountdownAndStart();
+                } else {
+                    startBtn.innerText = 'Pause';
+                    startInterval();
+                }
+            } 
+        }
+
+        function playCountdownAndStart() {
+            const counts = ["3...", "2...", "1...", "Let's go! You've got this!"];
+            let index = 0;
+
+            speakText(counts[index]);
+            
+            const countdownInterval = setInterval(() => {
+                index++;
+                if (index < counts.length) {
+                    speakText(counts[index]);
+                } else {
+                    clearInterval(countdownInterval);
+                    startInterval();
+                }
+            }, 1000);
+        }
+
+        function startInterval() {
+            timerId = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft > 0 && timeLeft % 30 === 0) {
+                    speakText(`Woohoo, ${timeLeft} seconds down! Keep shining!`);
+                }
+                
+                if (timeLeft <= 0) {
+                    speakText("Yay! Time's up! You did amazing!");
+                    stopTimer();
+                    triggerRestTimer(); // Automatically start rest period post workout
+                }
+            }, 1000);
+        }
+
+        function stopTimer() { 
+            clearInterval(timerId); 
+            timerId = null; 
+            timeLeft = 60; 
+            updateTimerDisplay(); 
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn) startBtn.innerText = 'Start'; 
+        }
+
         function adjustTimer(amt) { timeLeft = Math.max(5, timeLeft + amt); updateTimerDisplay(); }
         function setDuration(min) { timeLeft = min * 60; updateTimerDisplay(); document.getElementById('duration-menu').classList.toggle('hidden'); }
         function toggleDurationMenu() { document.getElementById('duration-menu').classList.toggle('hidden'); }
+
+        /** REST TIMER WORKFLOW **/
+        function triggerRestTimer() {
+            restTimeLeft = 120; // Default 2 minutes rest
+            updateRestTimerDisplay();
+            document.getElementById('rest-container').classList.remove('hidden');
+            speakText("Set complete! Starting your 2 minute rest period.");
+
+            if (restTimerId) clearInterval(restTimerId);
+
+            restTimerId = setInterval(() => {
+                restTimeLeft--;
+                updateRestTimerDisplay();
+
+                if (restTimeLeft === 30) {
+                    speakText("30 seconds left of rest. Get ready!");
+                }
+
+                if (restTimeLeft <= 0) {
+                    skipRest();
+                    speakText("Rest time is over! Let's crush the next set!");
+                }
+            }, 1000);
+        }
+
+        function adjustRestTimer(amt) {
+            restTimeLeft = Math.max(15, restTimeLeft + amt);
+            updateRestTimerDisplay();
+        }
+
+        function skipRest() {
+            if (restTimerId) {
+                clearInterval(restTimerId);
+                restTimerId = null;
+            }
+            document.getElementById('rest-container').classList.add('hidden');
+        }
 
         /** LOGGING & EDITING LOGIC **/
         function addLog(dateKey, exercise, count, timeTaken) {
@@ -383,7 +555,7 @@
             document.getElementById('confirm-modal').classList.add('hidden');
         }
 
-        /** ENHANCED CALENDAR UI **/
+        /** ENHANCED CALENDAR UI WITH MONTHLY ACTIVITY FEED **/
         function renderCalendar() {
             const cal = document.getElementById('calendar'); 
             cal.innerHTML = '';
@@ -391,25 +563,55 @@
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth();
 
-            document.getElementById('month-name').innerText = currentMonth.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+            const monthNameString = currentMonth.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+            document.getElementById('month-name').innerText = monthNameString;
+            document.getElementById('month-feed-label').innerText = monthNameString;
 
             const firstDayIndex = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
             let activeDaysCount = 0;
             let totalMonthSessions = 0;
+            let monthFeedHTML = '';
 
             for(let i = 1; i <= daysInMonth; i++) {
                 const dateKey = `${year}-${month}-${i}`;
                 const logs = completedDays[dateKey] || [];
+                const targetDate = new Date(year, month, i);
+
                 if(logs.length > 0) {
                     activeDaysCount++;
                     totalMonthSessions += logs.length;
+
+                    const formattedDateStr = targetDate.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+                    
+                    logs.forEach((l, idx) => {
+                        const unitLabel = l.exercise === 'Plank' ? 'seconds' : 'reps';
+                        monthFeedHTML += `
+                            <div class="p-3 bg-purple-50/70 border border-purple-100 rounded-2xl flex justify-between items-center shadow-xs">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold text-purple-900">${formattedDateStr}</span>
+                                        <span class="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full font-bold">${l.exercise}</span>
+                                    </div>
+                                    <div class="text-xs text-purple-700 font-medium mt-0.5">Performance: ${l.count} ${unitLabel} (${l.timeTaken})</div>
+                                </div>
+                                <button onclick="showDetailsForDate('${dateKey}', new Date(${year}, ${month}, ${i}))" class="text-xs bg-white text-purple-700 px-3 py-1.5 rounded-xl font-bold shadow-xs hover:bg-purple-100">View Day</button>
+                            </div>
+                        `;
+                    });
                 }
             }
 
             document.getElementById('month-active-days').innerText = activeDaysCount;
             document.getElementById('month-total-sessions').innerText = totalMonthSessions;
+
+            const feedContainer = document.getElementById('monthly-history-feed');
+            if (monthFeedHTML !== '') {
+                feedContainer.innerHTML = monthFeedHTML;
+            } else {
+                feedContainer.innerHTML = `<div class="text-gray-400 italic text-center py-4">No workout records found for ${monthNameString}.</div>`;
+            }
 
             for (let i = 0; i < firstDayIndex; i++) {
                 const emptyCell = document.createElement('div');
@@ -462,13 +664,76 @@
             addLog(`${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`, exerciseType, timeLeft, volumeLabel); 
             alert("Workout automatically saved to calendar!"); 
             stopTimer(); 
+            triggerRestTimer(); // Trigger rest timer upon saving as well
         }
         
         function exportData() { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(completedDays)); a.download = "workout_data.json"; a.click(); }
-        function openHistory() { switchTab('history'); const all = Object.values(completedDays).flat(); document.getElementById('stats-total').innerText = all.length; document.getElementById('stats-details').innerText = `Planks: ${all.filter(e => e.exercise === 'Plank').length} | Push-ups: ${all.filter(e => e.exercise === 'Push-ups').length}`; }
-        function clearData() { if (confirm("Reset all history?")) { localStorage.removeItem('plankDays'); completedDays = {}; renderCalendar(); alert("Cleared!"); } }
+        
+        function openHistory() { 
+            switchTab('history'); 
+            const allLogs = Object.values(completedDays).flat(); 
+            document.getElementById('stats-total').innerText = allLogs.length; 
+            document.getElementById('stats-details').innerText = `Planks: ${allLogs.filter(e => e.exercise === 'Plank').length} | Push-ups: ${allLogs.filter(e => e.exercise === 'Push-ups').length}`;
+            renderBadges(allLogs);
+        }
 
-        /** MOTION RECOGNITION (MEDIAPIPE POSE) **/
+        /** MILESTONE BADGES SYSTEM **/
+        function renderBadges(allLogs) {
+            const uniqueActiveDays = Object.keys(completedDays).length;
+            const totalPlankSeconds = allLogs.filter(e => e.exercise === 'Plank').reduce((acc, curr) => acc + Number(curr.count || 0), 0);
+            const totalPushupReps = allLogs.filter(e => e.exercise === 'Push-ups').reduce((acc, curr) => acc + Number(curr.count || 0), 0);
+
+            const badges = [
+                {
+                    title: "First Step",
+                    desc: "Complete your first workout session",
+                    unlocked: allLogs.length >= 1,
+                    icon: "🎯"
+                },
+                {
+                    title: "Consistency King",
+                    desc: "Log workouts across 3 unique days",
+                    unlocked: uniqueActiveDays >= 3,
+                    icon: "🔥"
+                },
+                {
+                    title: "Core Master",
+                    desc: "Accumulate 180+ seconds of planking",
+                    unlocked: totalPlankSeconds >= 180,
+                    icon: "🛡️"
+                },
+                {
+                    title: "Push-up Power",
+                    desc: "Complete 50+ total push-up reps",
+                    unlocked: totalPushupReps >= 50,
+                    icon: "💪"
+                },
+                {
+                    title: "Workout Pro",
+                    desc: "Complete 10 total workout sessions",
+                    unlocked: allLogs.length >= 10,
+                    icon: "🌟"
+                }
+            ];
+
+            let unlockedCount = badges.filter(b => b.unlocked).length;
+            document.getElementById('badge-counter').innerText = `${unlockedCount}/${badges.length} Unlocked`;
+
+            const grid = document.getElementById('badges-grid');
+            grid.innerHTML = badges.map(b => `
+                <div class="p-3.5 rounded-2xl border flex items-center gap-3 transition-all ${b.unlocked ? 'bg-purple-50/80 border-purple-200 shadow-xs' : 'bg-gray-50 border-gray-100 opacity-50 grayscale' }">
+                    <div class="text-2xl">${b.icon}</div>
+                    <div class="overflow-hidden">
+                        <div class="text-xs font-bold ${b.unlocked ? 'text-purple-900' : 'text-gray-500'}">${b.title}</div>
+                        <div class="text-[10px] text-gray-500 leading-tight mt-0.5">${b.desc}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function clearData() { if (confirm("Reset all history?")) { localStorage.removeItem('plankDays'); completedDays = {}; renderCalendar(); openHistory(); alert("Cleared!"); } }
+
+        /** MOTION RECOGNITION WITH FORM CHECKING & VISUAL FEEDBACK **/
         function initCamera() {
             document.getElementById('camera-placeholder').classList.add('hidden');
             const videoElement = document.getElementById('webcam');
@@ -493,15 +758,50 @@
                 canvasCtx.save();
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 
+                let isFormGood = true;
+
                 if (results.poseLandmarks) {
-                    for (const landmark of results.poseLandmarks) {
+                    const landmarks = results.poseLandmarks;
+                    const currentExercise = document.getElementById('exercise-title').innerText;
+
+                    const shoulder = landmarks[11];
+                    const hip = landmarks[23];
+                    const ankle = landmarks[27];
+
+                    if (currentExercise === 'Plank') {
+                        if (shoulder && hip && ankle) {
+                            const expectedHipY = shoulder.y + (ankle.y - shoulder.y) * 0.5;
+                            const hipDeviation = Math.abs(hip.y - expectedHipY);
+                            if (hipDeviation > 0.12) {
+                                isFormGood = false;
+                            }
+                        }
+                    } else {
+                        if (shoulder && hip && ankle) {
+                            const expectedHipY = shoulder.y + (ankle.y - shoulder.y) * 0.5;
+                            const hipDeviation = Math.abs(hip.y - expectedHipY);
+                            if (hipDeviation > 0.15) {
+                                isFormGood = false;
+                            }
+                        }
+                    }
+
+                    const themeColor = isFormGood ? '#22c55e' : '#ef4444';
+
+                    for (const landmark of landmarks) {
                         const x = landmark.x * canvasElement.width;
                         const y = landmark.y * canvasElement.height;
-                        canvasCtx.fillStyle = '#c084fc';
+                        canvasCtx.fillStyle = themeColor;
                         canvasCtx.beginPath();
-                        canvasCtx.arc(x, y, 4, 0, 2 * Math.PI);
+                        canvasCtx.arc(x, y, 5, 0, 2 * Math.PI);
                         canvasCtx.fill();
                     }
+
+                    canvasCtx.font = "bold 16px sans-serif";
+                    canvasCtx.fillStyle = themeColor;
+                    canvasCtx.shadowColor = "black";
+                    canvasCtx.shadowBlur = 4;
+                    canvasCtx.fillText(isFormGood ? "✔ Good Form!" : "❌ Adjust Position!", 20, 40);
                 }
                 canvasCtx.restore();
             });
@@ -516,7 +816,7 @@
             camera.start();
         }
 
-        /** GEMINI CHAT INTEGRATION WITH WEBCAM VISION **/
+        /** GEMINI CHAT INTEGRATION WITH DYNAMIC SESSION STATE & WEBCAM VISION **/
         async function sendChatMessage() {
             const inputField = document.getElementById('chat-input');
             const chatMessages = document.getElementById('chat-messages');
@@ -529,15 +829,30 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             const typingId = 'typing-' + Date.now();
-            chatMessages.innerHTML += `<div id="${typingId}" class="text-left"><span class="inline-block bg-gray-200 text-gray-600 px-3 py-1.5 rounded-2xl text-xs">Coach is analyzing your form...</span></div>`;
+            chatMessages.innerHTML += `<div id="${typingId}" class="text-left"><span class="inline-block bg-gray-200 text-gray-600 px-3 py-1.5 rounded-2xl text-xs">Coach is reviewing your session...</span></div>`;
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const apiKey = "YOUR_GEMINI_API_KEY"; // Replace with your actual Gemini API key
+                const apiKey = "YOUR_GEMINI_API_KEY"; 
                 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
                 const currentExercise = document.getElementById('exercise-title').innerText;
-                const systemPrompt = `You are an expert, encouraging fitness trainer AI in a workout app called Workout Pro. The user is currently performing: ${currentExercise}. Look closely at the provided image of the user to evaluate their physical form, posture, or alignment. Give concise, direct, and helpful coaching advice based on what you actually see.`;
+                const currentTimerValue = timeLeft;
+                
+                const today = new Date();
+                const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+                const todaysLogs = completedDays[todayKey] || [];
+                const logSummary = todaysLogs.length > 0 
+                    ? JSON.stringify(todaysLogs) 
+                    : "No sets saved yet today.";
+
+                const systemPrompt = `You are an expert, encouraging fitness trainer AI in a workout app called Workout Pro. 
+Current Context:
+- The user is working on: ${currentExercise}
+- Current timer/duration setting: ${currentTimerValue} seconds left or targeted.
+- Today's completed workout logs: ${logSummary}
+
+Look closely at the provided image of the user to evaluate their physical form, posture, or alignment right now. Give a dynamic, personalized, concise response that directly answers their question based on what they just finished or how they are positioned in the camera frame. Avoid repeating generic templates; tailor your advice specifically to their current state.`;
 
                 const videoElement = document.getElementById('webcam');
                 let imagePart = null;
@@ -581,7 +896,7 @@
                 const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Keep your core tight and maintain your form!";
 
                 document.getElementById(typingId).remove();
-                chatMessages.innerHTML += `<div class="text-left"><span class="inline-block bg-purple-100 text-purple-900 px-3 py-1.5 rounded-2xl text-xs max-w-[80%]">${aiReply}</span></div>`;
+                chatMessages.innerHTML += `<div class="text-left"><span class="inline-block bg-purple-100 text-purple-900 px-3 py-1.5 rounded-2xl text-xs max-w-[80%]" >${aiReply}</span></div>`;
             } catch (error) {
                 console.error("Chat error:", error);
                 document.getElementById(typingId).remove();
